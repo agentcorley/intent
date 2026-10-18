@@ -1,15 +1,15 @@
 import './style.css';
 import { loadConfig } from '../../config/src/index.ts';
 import { createTracker, MATCH_EVENT, type MatchDetail, type Tracker } from '../../tracker/src/index.ts';
-import { normalize, SIGNAL_FLOOR, type EngineConfig } from '../../core/src/index.ts';
+import { accumulate, match, normalize, SIGNAL_FLOOR, type Archetype, type EngineConfig } from '../../core/src/index.ts';
 import { examples } from './examples/index.ts';
-import type { Copy, Example } from './examples/types.ts';
+import type { Copy, Example, Scenario } from './examples/types.ts';
 import { mountGraph } from './graph-mount.ts';
 
 const DAY = 24 * 60 * 60 * 1000;
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
-// Demo-only state (clock offset, read counts, chosen industry). Wrapped: storage can be unavailable.
+// Demo-only state (clock offset, reads, chosen industry, quiz streak). Wrapped: storage can be unavailable.
 const store = {
   get<T>(key: string, fallback: T): T {
     try { return (JSON.parse(localStorage.getItem(`intent-demo3:${key}`) ?? 'null') as T) ?? fallback; } catch { return fallback; }
@@ -25,14 +25,18 @@ let ex: Example;
 let config: EngineConfig;
 let tracker: Tracker;
 let offset = 0;
-let counts: Record<string, number> = {};
+/** Counted reads for this example, in order. Repeats inside the window are not here. */
+let reads: string[] = [];
 let hue = new Map<string, string>();
 let categoryById = new Map<string, EngineConfig['categories'][number]>();
-let archetypeById = new Map<string, EngineConfig['archetypes'][number]>();
+let archetypeById = new Map<string, Archetype>();
 
+const now = () => Date.now() + offset;
+const countOf = (id: string) => reads.filter((r) => r === id).length;
 const attrLabel = (cid: string, aid: string | null) =>
   aid ? categoryById.get(cid)?.attributes.find((a) => a.id === aid)?.label ?? aid : '';
 const archLabel = (id: string | null) => (id ? archetypeById.get(id)?.label ?? id : '');
+const titleOf = (id: string) => ex.content.find((c) => c.id === id)?.title ?? id;
 /** Category hue class by config order: k1 to k5. */
 const k = (cid: string) => hue.get(cid) ?? 'k1';
 
@@ -41,16 +45,22 @@ const closeness = (fit: number) => (fit >= 0.66 ? 'Strong match' : fit >= 0.33 ?
 
 const graph = mountGraph($('#graph'));
 
-function load(id: string) {
+function parseHash() {
+  const [id, qs] = location.hash.slice(1).split('?');
+  const list = new URLSearchParams(qs ?? '').get('reads');
+  return { id, reads: list ? list.split(',').filter(Boolean) : [] };
+}
+
+function load(id: string, pending: string[] = []) {
   ex = examples.find((e) => e.id === id) ?? examples[0];
   config = loadConfig(ex.config);
   categoryById = new Map(config.categories.map((c) => [c.id, c]));
   archetypeById = new Map(config.archetypes.map((a) => [a.id, a]));
   hue = new Map(config.categories.map((c, i) => [c.id, `k${i + 1}`]));
   offset = store.get(`${ex.id}:offset`, 0);
-  counts = store.get(`${ex.id}:counts`, {});
+  reads = store.get(`${ex.id}:reads`, []);
   store.set('example', ex.id);
-  if (location.hash.slice(1) !== ex.id) history.replaceState(null, '', `#${ex.id}`);
+  history.replaceState(null, '', `#${ex.id}`);
 
   // Attributes from the previous industry's categories must not linger on <html>.
   for (const a of [...document.documentElement.attributes]) {
@@ -59,7 +69,7 @@ function load(id: string) {
 
   // random: () => 1 keeps the demo visitor out of the control group unless the switch is on.
   tracker = createTracker({
-    config, tags: ex.tags, clock: () => Date.now() + offset, random: () => 1, storageKey: `intent-demo:${ex.id}`,
+    config, tags: ex.tags, clock: now, random: () => 1, storageKey: `intent-demo:${ex.id}`,
   });
 
   $<HTMLSelectElement>('#industry-select').value = ex.id;
@@ -69,11 +79,22 @@ function load(id: string) {
   heroKey = '';
   lastLog = '';
   logEl.innerHTML = '';
+  endQuiz();
   buildCards();
   buildAudiences();
   graph.load(ex, config);
   renderDay();
   tracker.refresh();
+
+  // A shared link replays its visitor. A first visit plays one unasked, so the aha costs no clicks.
+  const valid = pending.filter((r) => ex.tags[r]);
+  const firstVisit = !store.get('seen', false);
+  if (valid.length) {
+    setTimeout(() => playPath(valid), 500);
+  } else if (firstVisit && !reads.length) {
+    store.set('seen', true);
+    setTimeout(() => playScenario(ex.scenarios[0]), 700);
+  }
 }
 
 /* ---------- Industry switcher, scenarios, time ---------- */
@@ -87,28 +108,38 @@ $('#industry').addEventListener('change', (e) => {
   if (!playing) load((e.target as HTMLSelectElement).value);
 });
 window.addEventListener('hashchange', () => {
-  const id = location.hash.slice(1);
-  if (id && id !== ex.id && !playing) load(id);
+  const { id, reads: pending } = parseHash();
+  if (id && (id !== ex.id || pending.length) && !playing) load(id, pending);
 });
 
 let playing = false;
-$('#scenarios').addEventListener('click', async (e) => {
+
+$('#scenarios').addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-scenario]');
   const scenario = ex.scenarios.find((s) => s.id === btn?.dataset.scenario);
-  if (!scenario || playing) return;
+  if (scenario) playScenario(scenario);
+});
+
+function playScenario(scenario: Scenario) {
+  const btn = $('#scenarios').querySelector<HTMLElement>(`[data-scenario="${scenario.id}"]`) ?? undefined;
+  return playPath(scenario.path, btn);
+}
+
+async function playPath(path: string[], btn?: HTMLElement) {
+  if (playing) return;
   playing = true;
   document.body.classList.add('playing');
-  btn!.classList.add('active');
+  btn?.classList.add('active');
   resetVisitor();
-  for (const id of scenario.path) {
+  for (const id of path) {
     await wait(560);
     read(id);
   }
   await wait(400);
-  btn!.classList.remove('active');
+  btn?.classList.remove('active');
   document.body.classList.remove('playing');
   playing = false;
-});
+}
 
 $('#ff').addEventListener('click', () => {
   offset += 7 * DAY;
@@ -127,9 +158,9 @@ holdoutBox.addEventListener('change', () => tracker.setHoldout(holdoutBox.checke
 
 function resetVisitor() {
   offset = 0;
-  counts = {};
+  reads = [];
   store.set(`${ex.id}:offset`, offset);
-  store.set(`${ex.id}:counts`, counts);
+  store.set(`${ex.id}:reads`, reads);
   renderDay();
   tracker.reset();
 }
@@ -139,6 +170,130 @@ function renderDay() {
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : ms));
+
+/* ---------- Quiz: read the audiences, call the archetype ---------- */
+
+const quiz = { active: false, revealed: false, answer: '', scenario: undefined as Scenario | undefined };
+let streak = store.get('streak', 0);
+let best = store.get('best', 0);
+const masked = () => quiz.active && !quiz.revealed;
+const quizEl = $('#quiz');
+
+$('#quiz-btn').addEventListener('click', () => startQuiz());
+
+async function startQuiz() {
+  if (playing) return;
+  const pool = ex.scenarios.filter((s) => s.id !== quiz.scenario?.id);
+  const scenario = pool[Math.floor(Math.random() * pool.length)];
+  quiz.active = true;
+  quiz.revealed = false;
+  quiz.scenario = scenario;
+  quiz.answer = '';
+  document.body.classList.add('quiz');
+  renderQuiz('playing');
+  await playScenario(scenario);
+  quiz.answer = tracker.matches().archetype.archetype ?? scenario.expects;
+  renderQuiz('choose');
+}
+
+function answerQuiz(id: string) {
+  const right = id === quiz.answer;
+  streak = right ? streak + 1 : 0;
+  best = Math.max(best, streak);
+  store.set('streak', streak);
+  store.set('best', best);
+  quiz.revealed = true;
+  document.body.classList.remove('quiz');
+  renderQuiz(right ? 'right' : 'wrong');
+  tracker.refresh();
+}
+
+function endQuiz() {
+  quiz.active = false;
+  quiz.revealed = false;
+  document.body.classList.remove('quiz');
+  renderQuiz('idle');
+}
+
+function renderQuiz(state: 'idle' | 'playing' | 'choose' | 'right' | 'wrong') {
+  quizEl.hidden = state === 'idle';
+  quizEl.dataset.state = state;
+  const score = `<span class="q-score">Streak ${streak}${best > 0 ? ` · best ${best}` : ''}</span>`;
+  const again = `<button class="q-again" data-quiz="again">Next visitor</button><button class="q-done" data-quiz="done">Done</button>`;
+  quizEl.innerHTML =
+    state === 'playing'
+      ? `<span class="q-tag">Quiz</span><span class="q-text">A visitor is reading. Watch the audiences fill in, then call the archetype.</span>${score}`
+      : state === 'choose'
+        ? `<span class="q-tag">Quiz</span><span class="q-text">Who is this visitor?</span><span class="q-choices">${config.archetypes
+            .map((a) => `<button data-quiz="${a.id}">${a.label}</button>`)
+            .join('')}</span>${score}`
+        : state === 'right'
+          ? `<span class="q-tag ok">Right</span><span class="q-text">It’s the <b>${archLabel(quiz.answer)}</b>. ${
+              streak >= 3 ? 'You read audiences like the engine does.' : 'The audiences gave it away.'
+            }</span>${score}${again}`
+          : `<span class="q-tag miss">Not quite</span><span class="q-text">It was the <b>${archLabel(quiz.answer)}</b>. The fingerprint on the right shows why.</span>${score}${again}`;
+}
+
+quizEl.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-quiz]');
+  const v = btn?.dataset.quiz;
+  if (!v) return;
+  if (v === 'done') endQuiz();
+  else if (v === 'again') startQuiz();
+  else if (!quiz.revealed) answerQuiz(v);
+});
+
+/* ---------- Suggestions: what one more read would do ---------- */
+
+interface Suggestion {
+  ids: string[];
+  label: string;
+}
+
+/** How much a page's tags overlap an archetype's fingerprint, optionally within some categories only. */
+function overlap(arch: Archetype, id: string, only?: string[]): number {
+  return Object.entries(arch.fingerprint)
+    .filter(([cid]) => !only || only.includes(cid))
+    .reduce((s, [cid, target]) => s + Object.entries(target).reduce((t, [aid, v]) => t + v * (ex.tags[id]?.[cid]?.[aid] ?? 0), 0), 0);
+}
+
+/**
+ * Matched: the two unread pages that deepen the match. Near: the one unread
+ * page that would complete it, found by simulating the read with the engine.
+ */
+function suggest(d: MatchDetail): Suggestion {
+  const none = { ids: [], label: '' };
+  if (d.holdout || masked()) return none;
+  const id = d.archetype.archetype ?? d.archetype.nearest;
+  const arch = id ? archetypeById.get(id) : undefined;
+  if (!arch) return none;
+  const unread = ex.content.filter((c) => !countOf(c.id));
+
+  if (d.archetype.archetype) {
+    const ids = unread
+      .map((c) => ({ id: c.id, score: overlap(arch, c.id) }))
+      .filter((c) => c.score >= 0.5)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2)
+      .map((c) => c.id);
+    return { ids, label: 'Up next' };
+  }
+
+  const state = tracker.state();
+  const t = now();
+  const wins = unread
+    .filter((c) => match(config, accumulate(state, ex.tags[c.id], t, config.halfLifeMs), t).archetype.archetype === arch.id)
+    .map((c) => ({ id: c.id, score: overlap(arch, c.id) }))
+    .sort((a, b) => b.score - a.score);
+  if (wins.length) return { ids: [wins[0].id], label: 'One read away' };
+
+  const only = d.archetype.missing.length ? d.archetype.missing : undefined;
+  const closer = unread
+    .map((c) => ({ id: c.id, score: overlap(arch, c.id, only) }))
+    .filter((c) => c.score > 0)
+    .sort((a, b) => b.score - a.score)[0];
+  return closer ? { ids: [closer.id], label: 'Closer with' } : none;
+}
 
 /* ---------- Content cards ---------- */
 
@@ -172,18 +327,18 @@ function buildCards() {
 
 cards.addEventListener('click', (e) => {
   const card = (e.target as HTMLElement).closest<HTMLElement>('.card');
-  if (card && !playing) read(card.dataset.id!);
+  if (card && !playing && !masked()) read(card.dataset.id!);
 });
 
 function read(id: string) {
   const before = tracker.matches().views;
   const card = cards.querySelector<HTMLElement>(`[data-id="${id}"]`)!;
-  // The tracker fires the match event synchronously, so counts must be set first.
-  counts[id] = (counts[id] ?? 0) + 1;
+  // The tracker fires the match event synchronously, so reads must be updated first.
+  reads.push(id);
   const after = tracker.view(id).views;
   if (after === before) {
     // Repeat inside the 30-minute window: the engine ignored it.
-    counts[id] -= 1;
+    reads.pop();
     card.classList.remove('repeat');
     void card.offsetWidth;
     card.classList.add('repeat');
@@ -191,7 +346,7 @@ function read(id: string) {
     setTimeout(() => renderCards(tracker.matches()), 1400);
     return;
   }
-  store.set(`${ex.id}:counts`, counts);
+  store.set(`${ex.id}:reads`, reads);
   card.classList.remove('pulse');
   void card.offsetWidth;
   card.classList.add('pulse');
@@ -199,31 +354,15 @@ function read(id: string) {
 }
 
 function renderCards(d: MatchDetail) {
-  // “Up next”: unread content whose tags overlap most with the matched archetype.
-  // Overlap, not distance: an unrelated page must not outrank a related one.
-  const arch = d.archetype.archetype ? archetypeById.get(d.archetype.archetype) : undefined;
-  const next = new Set<string>();
-  if (arch && !d.holdout) {
-    const overlap = (id: string) =>
-      Object.entries(arch.fingerprint).reduce(
-        (s, [cid, target]) => s + Object.entries(target).reduce((t, [aid, v]) => t + v * (ex.tags[id]?.[cid]?.[aid] ?? 0), 0),
-        0,
-      );
-    ex.content
-      .filter((c) => !counts[c.id])
-      .map((c) => ({ id: c.id, score: overlap(c.id) }))
-      .filter((c) => c.score >= 0.5)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 2)
-      .forEach((c) => next.add(c.id));
-  }
+  const s = suggest(d);
   for (const card of cards.querySelectorAll<HTMLElement>('.card')) {
     const id = card.dataset.id!;
-    const n = counts[id] ?? 0;
+    const n = countOf(id);
     card.classList.toggle('is-read', n > 0);
     card.querySelector('.read')!.textContent = n ? (n > 1 ? `Read ×${n}` : 'Read') : '';
-    card.classList.toggle('is-next', next.has(id));
-    card.querySelector('.next')!.textContent = next.has(id) && arch ? 'Up next' : '';
+    const hit = s.ids.includes(id);
+    card.classList.toggle('is-next', hit);
+    card.querySelector('.next')!.textContent = hit ? s.label : '';
   }
 }
 
@@ -247,10 +386,11 @@ function composeHero(arch: string | null, aud: Record<string, string | null>): C
 
 function renderHero(d: MatchDetail) {
   // Control-group visitors see the default, exactly as the CMS would serve them.
+  // During the quiz the archetype stays hidden; audiences are the clue.
   const live = !d.holdout;
   const aud = Object.fromEntries(d.audiences.map((a) => [a.category, live ? a.audience : null]));
-  const arch = live ? d.archetype.archetype : null;
-  const key = `${ex.id}|${arch}|${d.audiences.map((a) => aud[a.category] ?? '-').join('|')}`;
+  const arch = live && !masked() ? d.archetype.archetype : null;
+  const key = `${ex.id}|${masked()}|${arch}|${d.audiences.map((a) => aud[a.category] ?? '-').join('|')}`;
   if (key === heroKey) return;
   heroKey = key;
 
@@ -259,7 +399,11 @@ function renderHero(d: MatchDetail) {
     arch ? `<span class="chip arch">${archLabel(arch)}</span>` : '',
     ...d.audiences.filter((a) => aud[a.category]).map((a) => `<span class="chip ${k(a.category)}">${attrLabel(a.category, a.audience)}</span>`),
   ].filter(Boolean);
-  const label = d.holdout ? 'Control group · default on purpose' : chips.length ? (arch ? 'Archetype' : 'Personalized for') : d.ready ? 'Signal too mixed' : 'Learning';
+  const label = d.holdout
+    ? 'Control group · default on purpose'
+    : masked()
+      ? 'Quiz · archetype hidden'
+      : chips.length ? (arch ? 'Archetype' : 'Personalized for') : d.ready ? 'Signal too mixed' : 'Learning';
 
   heroEl.innerHTML = `
     <div class="hero-glow" aria-hidden="true">
@@ -291,7 +435,22 @@ function renderWarmup(d: MatchDetail) {
 
 const archEl = $('#archetype');
 
+archEl.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-read]');
+  if (btn && !playing && !masked()) read(btn.dataset.read!);
+});
+
 function renderArchetype(d: MatchDetail) {
+  if (masked()) {
+    archEl.dataset.state = 'quiz';
+    archEl.innerHTML = `
+      <header><span class="eyebrow-sm">Archetype</span><span class="a-status">hidden until you answer</span></header>
+      <h3 class="a-title q-mark">?</h3>
+      <div class="fit"><span class="fit-bar"><i style="transform:scaleX(0)"></i></span></div>
+      <p class="q-hint">The audiences below are the clue. Which combination is this?</p>`;
+    return;
+  }
+
   const a = d.archetype;
   const id = a.archetype ?? a.nearest;
   const fp = id ? archetypeById.get(id)!.fingerprint : {};
@@ -329,6 +488,12 @@ function renderArchetype(d: MatchDetail) {
     })
     .join('');
 
+  // The actionable part: what one more read would do. A button, so the explanation can be tested.
+  const s = state === 'near' ? suggest(d) : { ids: [], label: '' };
+  const nudge = s.ids.length
+    ? `<button class="nudge" data-read="${s.ids[0]}"><span class="n-label">${s.label}</span><span class="n-title">${titleOf(s.ids[0])}</span><span aria-hidden="true">→</span></button>`
+    : '';
+
   archEl.dataset.state = state;
   archEl.innerHTML = `
     <header>
@@ -342,7 +507,7 @@ function renderArchetype(d: MatchDetail) {
         ? `<div class="roster"><span class="eyebrow-sm">Watching for</span>${config.archetypes
             .map((x) => `<span>${x.label}</span>`)
             .join('')}</div>`
-        : `<ul class="fingerprint">${rows}</ul>`
+        : `<ul class="fingerprint">${rows}</ul>${nudge}`
     }`;
 }
 
@@ -406,25 +571,28 @@ let lastLog = '';
 
 function renderContract(d: MatchDetail) {
   const html = document.documentElement;
+  const hide = masked() ? d.archetype.archetype : null;
+  const show = (v: string) => (hide && v.includes(hide) ? v.replaceAll(hide, '?') : v);
   const keys = [...config.categories.map((c) => c.id), 'archetype', 'holdout'];
   const lines = keys.map((key) => {
     const v = html.getAttribute(`data-intent-${key}`);
     const cls = key === 'archetype' ? 'is-arch' : key === 'holdout' ? 'is-hold' : k(key);
     return v
-      ? `  <span class="k">data-intent-${key}</span>=<span class="v ${cls}">"${v}"</span>`
+      ? `  <span class="k">data-intent-${key}</span>=<span class="v ${cls}">"${show(v)}"</span>`
       : `  <span class="k dim">data-intent-${key}</span>`;
   });
   const cookie = document.cookie.split('; ').find((c) => c.startsWith('intent='))?.slice(7) ?? '';
   attrsEl.innerHTML =
     `<span class="c">&lt;html</span>\n${lines.join('\n')}<span class="c">&gt;</span>\n\n` +
-    `<span class="k">cookie</span> intent=${cookie ? `<span class="v">${decodeURIComponent(cookie)}</span>` : '<span class="c">(none)</span>'}`;
+    `<span class="k">cookie</span> intent=${cookie ? `<span class="v">${show(decodeURIComponent(cookie))}</span>` : '<span class="c">(none)</span>'}`;
 
   holdoutBox.checked = d.holdout;
 
+  if (masked()) return;
   const summary = `${d.holdout}|${d.archetype.archetype}|${d.audiences.map((a) => a.audience).join(',')}`;
   if (summary === lastLog) return;
   lastLog = summary;
-  const time = new Date(Date.now() + offset).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  const time = new Date(now()).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
   const matched = d.audiences.filter((a) => a.audience).length;
   const what = d.holdout
     ? '<span class="is-hold">control group</span>'
@@ -437,6 +605,62 @@ function renderContract(d: MatchDetail) {
   while (logEl.children.length > 4) logEl.lastElementChild!.remove();
 }
 
+/* ---------- Take it with you ---------- */
+
+const toastEl = $('#toast');
+let toastTimer = 0;
+
+function toast(message: string) {
+  toastEl.textContent = message;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => toastEl.classList.remove('show'), 2400);
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  }
+}
+
+/** When the clipboard is blocked, show the text selected so one keystroke finishes the job. */
+const fallbackEl = $<HTMLTextAreaElement>('#copy-fallback');
+async function handOver(text: string, success: string) {
+  if (await copyText(text)) {
+    fallbackEl.hidden = true;
+    toast(success);
+    return;
+  }
+  fallbackEl.hidden = false;
+  fallbackEl.value = text;
+  fallbackEl.focus();
+  fallbackEl.select();
+  toast('Clipboard blocked here. The text is selected: press ⌘C or Ctrl+C.');
+}
+
+$('#copy-config').addEventListener('click', () => {
+  const block =
+    `<script type="application/json" id="intent-config">\n${JSON.stringify({ config: ex.config, tags: ex.tags }, null, 2)}\n</script>\n` +
+    `<script src="intent.min.js"></script>`;
+  handOver(block, `${ex.brand} config copied. Paste it into your site’s <head> and rename the attributes to yours.`);
+});
+
+$('#share').addEventListener('click', () => {
+  const url = `${location.origin}${location.pathname}#${ex.id}${reads.length ? `?reads=${reads.join(',')}` : ''}`;
+  handOver(url, reads.length ? 'Link copied. It replays this visitor for whoever opens it.' : 'Link copied. Read a few pages first and the link will replay them.');
+});
+
 /* ---------- Wire to the contract, exactly as a CMS would ---------- */
 
 document.addEventListener(MATCH_EVENT, (e) => {
@@ -447,7 +671,8 @@ document.addEventListener(MATCH_EVENT, (e) => {
   renderAudiences(d);
   renderCards(d);
   renderContract(d);
-  graph.update(tracker.state(), d);
+  if (!masked()) graph.update(tracker.state(), d);
 });
 
-load(location.hash.slice(1) || store.get('example', examples[0]?.id ?? ''));
+const start = parseHash();
+load(start.id || store.get('example', examples[0]?.id ?? ''), start.reads);

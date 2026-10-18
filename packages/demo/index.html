@@ -23,6 +23,7 @@
         <div class="scenarios" role="group" aria-label="Play a visitor">
           <span class="label">Play a visitor</span>
           <div id="scenarios" class="seg"></div>
+          <button class="ghost quiz-btn" id="quiz-btn" title="A visitor reads. You call the archetype.">Quiz me</button>
         </div>
         <div class="time" role="group" aria-label="Time">
           <span class="day" id="day">Day 0</span>
@@ -53,6 +54,7 @@
           <h2>What the engine sees</h2>
           <span class="warmup" id="warmup"></span>
         </div>
+        <div id="quiz" class="quiz" hidden></div>
         <section class="archetype" id="archetype"></section>
         <div class="section-label">
           <h3>Audiences</h3>
@@ -71,6 +73,17 @@
           <pre id="attrs" class="code"></pre>
           <ol id="log" class="log" aria-live="polite"></ol>
         </div>
+        <div class="next-steps">
+          <div>
+            <h3>Take it with you</h3>
+            <p class="hint">This whole setup is a starter config. Rename the attributes and it’s yours.</p>
+          </div>
+          <div class="ns-buttons">
+            <button class="primary" id="copy-config">Copy this config</button>
+            <button class="ghost" id="share">Share this visitor</button>
+          </div>
+          <textarea id="copy-fallback" class="copy-fallback" hidden rows="4" readonly aria-label="Text to copy"></textarea>
+        </div>
       </aside>
     </main>
 
@@ -84,6 +97,8 @@
       </div>
       <div id="graph" class="graph-wrap"></div>
     </section>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script type="module" src="./src/main.ts"></script>
   </body>
