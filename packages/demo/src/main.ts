@@ -218,6 +218,10 @@ function endQuiz() {
 function renderQuiz(state: 'idle' | 'playing' | 'choose' | 'right' | 'wrong') {
   quizEl.hidden = state === 'idle';
   quizEl.dataset.state = state;
+  if (state === 'idle') {
+    quizEl.innerHTML = '';
+    return;
+  }
   const score = `<span class="q-score">Streak ${streak}${best > 0 ? ` · best ${best}` : ''}</span>`;
   const again = `<button class="q-again" data-quiz="again">Next visitor</button><button class="q-done" data-quiz="done">Done</button>`;
   quizEl.innerHTML =

@@ -710,6 +710,7 @@ body.playing .select { opacity: 0.4; pointer-events: none; }
 .quiz-btn:hover { border-color: var(--c5); }
 body.quiz .quiz-btn { opacity: 0.4; pointer-events: none; }
 
+.quiz[hidden] { display: none; }
 .quiz {
   position: relative;
   display: flex;
