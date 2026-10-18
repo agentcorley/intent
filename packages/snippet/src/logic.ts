@@ -1,8 +1,8 @@
 // Pure snippet logic: no DOM, no storage. Unit-tested in Node.
 
 import type { CategoryScores } from '../../core/src/index.ts';
-import type { ConfigInput } from '../../config/src/index.ts';
-import type { ContentTags, MatchDetail } from '../../tracker/src/index.ts';
+import { tagsToUnit, type ConfigInput, type Scale } from '../../config/src/index.ts';
+import { ACTIONS, type ContentTags, type MatchDetail } from '../../tracker/src/index.ts';
 
 /** What a site puts in `<script type="application/json" id="intent-config">`. */
 export interface SnippetSettings {
@@ -34,17 +34,18 @@ export function parseSettings(text: string | null | undefined): SnippetSettings 
 const isObject = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
 
 /** Parse content tags JSON (`{"industry":{"tech":0.8}}`). Null when missing or malformed. */
-export function parseTags(text: string | null | undefined): CategoryScores | null {
+export function parseTags(text: string | null | undefined, scale: Scale = 'unit'): CategoryScores | null {
   if (!text) return null;
   try {
-    return cleanTags(JSON.parse(text));
+    return cleanTags(JSON.parse(text), scale);
   } catch {
     return null;
   }
 }
 
 /** Keep only finite numeric scores. Null when nothing usable is left. */
-export function cleanTags(input: unknown): CategoryScores | null {
+/** Keep numeric scores only, converted from the config's scale to 0–1. */
+export function cleanTags(input: unknown, scale: Scale = 'unit'): CategoryScores | null {
   if (!isObject(input)) return null;
   const out: CategoryScores = {};
   for (const [c, attrs] of Object.entries(input)) {
@@ -53,15 +54,16 @@ export function cleanTags(input: unknown): CategoryScores | null {
       if (typeof v === 'number' && Number.isFinite(v)) (out[c] ??= {})[a] = v;
     }
   }
-  return Object.keys(out).length ? out : null;
+  const unit = tagsToUnit(out, scale);
+  return Object.keys(unit).length ? unit : null;
 }
 
 /** Clean a whole tag map (from tagsUrl or the config block), dropping unusable entries. */
-export function cleanTagMap(input: unknown): ContentTags {
+export function cleanTagMap(input: unknown, scale: Scale = 'unit'): ContentTags {
   const out: ContentTags = {};
   if (!isObject(input)) return out;
   for (const [id, tags] of Object.entries(input)) {
-    const clean = cleanTags(tags);
+    const clean = cleanTags(tags, scale);
     if (clean) out[id] = clean;
   }
   return out;
@@ -103,8 +105,11 @@ export function tagsId(tags: CategoryScores): string {
 }
 
 /** Weight from `data-intent-weight`. Missing or invalid falls back to the default. */
+/** A number, or an action name on the Fibonacci ladder: view 1, engage 2, save 3, download 5, convert 8. */
 export function parseWeight(value: string | null | undefined, fallback = DEFAULT_TRACK_WEIGHT): number {
   if (value == null || value.trim() === '') return fallback;
+  const named = ACTIONS[value.trim().toLowerCase() as keyof typeof ACTIONS];
+  if (named) return named;
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }

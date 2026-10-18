@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { MatchDetail } from '../../tracker/src/index.ts';
 import {
-  cleanTagMap, conditionMatches, optedOut, parseCondition, parseSettings, parseTags, parseWeight,
+  cleanTagMap, cleanTags, conditionMatches, optedOut, parseCondition, parseSettings, parseTags, parseWeight,
   pathCandidates, pickVariant, resolvePage, tagsId, DEFAULT_TRACK_WEIGHT,
 } from '../src/logic.ts';
 
@@ -170,4 +170,17 @@ test('GPC and DNT opt out by default; respectGPC false turns that off', () => {
   assert.equal(optedOut({}), false);
   assert.equal(optedOut(undefined), false);
   assert.equal(optedOut({ globalPrivacyControl: true }, false), false);
+});
+
+test('fibonacci scale: tags in points become 0–1, sloppy values snap', () => {
+  assert.deepEqual(cleanTags({ trip: { family: 8, beach: 4.2 } }, 'fibonacci'), { trip: { family: 1, beach: 0.625 } });
+  assert.deepEqual(parseTags('{"trip":{"family":3}}', 'fibonacci'), { trip: { family: 0.375 } });
+  assert.deepEqual(cleanTagMap({ page: { trip: { family: 5 } } }, 'fibonacci'), { page: { trip: { family: 0.625 } } });
+});
+
+test('parseWeight accepts action names on the Fibonacci ladder', () => {
+  assert.equal(parseWeight('download'), 5);
+  assert.equal(parseWeight('Convert'), 8);
+  assert.equal(parseWeight('3'), 3);
+  assert.equal(parseWeight('nonsense'), 2);
 });

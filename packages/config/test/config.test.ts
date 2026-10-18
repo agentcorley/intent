@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateConfig, loadConfig, ConfigError, MAX_CATEGORIES, MAX_ATTRIBUTES, DEFAULTS } from '../src/index.ts';
+import { validateConfig, loadConfig, ConfigError, MAX_CATEGORIES, MAX_ATTRIBUTES, DEFAULTS, snapToPoint, toUnit, tagsToUnit } from '../src/index.ts';
 
 const attrs = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `a${i}` }));
 const category = (id: string, n = 3) => ({ id, attributes: attrs(n) });
@@ -73,4 +73,32 @@ test('loadConfig throws a ConfigError listing every problem', () => {
 
 test('rejects non-objects', () => {
   assert.deepEqual(validateConfig(null), ['Config must be an object.']);
+});
+
+/* ---------- Fibonacci points ---------- */
+
+test('snapToPoint lands on the nearest Fibonacci point', () => {
+  assert.deepEqual([0, -2, 0.4, 1, 1.4, 2.6, 4, 4.1, 6.4, 6.6, 13].map(snapToPoint), [0, 0, 1, 1, 1, 3, 5, 5, 5, 8, 8]);
+});
+
+test('toUnit divides points by 8 and leaves unit scores alone', () => {
+  assert.equal(toUnit(8, 'fibonacci'), 1);
+  assert.equal(toUnit(2, 'fibonacci'), 0.25);
+  assert.equal(toUnit(0.6), 0.6);
+});
+
+test('tagsToUnit snaps sloppy AI points and drops zeros', () => {
+  assert.deepEqual(tagsToUnit({ trip: { family: 8, couples: 0, wellness: 4.2 } }, 'fibonacci'), { trip: { family: 1, wellness: 0.625 } });
+});
+
+test('a fibonacci config accepts points and converts fingerprints to 0–1', () => {
+  const c = { scale: 'fibonacci', categories: [category('trip')], archetypes: [{ id: 'x', fingerprint: { trip: { a0: 8, a1: 3 } } }] };
+  assert.deepEqual(validateConfig(c), []);
+  assert.deepEqual(loadConfig(c).archetypes[0].fingerprint, { trip: { a0: 1, a1: 0.375 } });
+});
+
+test('a fibonacci config rejects targets that are not points', () => {
+  const c = { scale: 'fibonacci', categories: [category('trip')], archetypes: [{ id: 'x', fingerprint: { trip: { a0: 4 } } }] };
+  assert.match(errs(c), /one of 0, 1, 2, 3, 5, 8/);
+  assert.match(errs({ ...valid(), scale: 'percent' }), /scale must be/);
 });

@@ -1,6 +1,6 @@
-// Config schema and load-time validation. Limits are deliberate; see CLAUDE.md.
+// Config schema and load-time validation. The limits are deliberate: they keep configuration simple.
 
-import type { EngineConfig } from '../../core/src/index.ts';
+import type { CategoryScores, EngineConfig } from '../../core/src/index.ts';
 
 export const MAX_CATEGORIES = 5;
 export const MAX_ATTRIBUTES = 8;
@@ -15,6 +15,41 @@ export const DEFAULTS = {
   holdoutPercent: 5,
 };
 
+/**
+ * Fibonacci points. People and models score more consistently on a few coarse
+ * steps that widen as they grow than on 0–1 decimals or 1–100. 0 means none.
+ */
+export const POINTS = [1, 2, 3, 5, 8] as const;
+export const POINTS_MAX = 8;
+/** `unit`: every score is 0–1. `fibonacci`: every score is 0, 1, 2, 3, 5, or 8. */
+export type Scale = 'unit' | 'fibonacci';
+
+const isPoint = (v: unknown) => v === 0 || (POINTS as readonly unknown[]).includes(v);
+
+/** Snap any number to the nearest point (ties go up; 0 and below stay 0). */
+export function snapToPoint(v: number): number {
+  if (!(v > 0)) return 0;
+  return POINTS.reduce((best, p) => (Math.abs(p - v) <= Math.abs(best - v) ? p : best), POINTS[0] as number);
+}
+
+/** Convert one score from the given scale to the engine's 0–1. Points are snapped first. */
+export function toUnit(v: number, scale: Scale = 'unit'): number {
+  return scale === 'fibonacci' ? snapToPoint(v) / POINTS_MAX : v;
+}
+
+/** Convert a page's tags to 0–1. Tags are often AI-written, so points are snapped, not rejected. */
+export function tagsToUnit(tags: CategoryScores, scale: Scale = 'unit'): CategoryScores {
+  if (scale === 'unit') return tags;
+  const out: CategoryScores = {};
+  for (const [c, attrs] of Object.entries(tags)) {
+    for (const [a, v] of Object.entries(attrs)) {
+      const u = toUnit(v, scale);
+      if (u > 0) (out[c] ??= {})[a] = u;
+    }
+  }
+  return out;
+}
+
 export class ConfigError extends Error {
   errors: string[];
   constructor(errors: string[]) {
@@ -28,6 +63,8 @@ export class ConfigError extends Error {
 export type ConfigInput = Pick<EngineConfig, 'categories'> &
   Partial<Pick<EngineConfig, 'archetypes' | 'audienceRadius' | 'archetypeRadius' | 'minViews' | 'holdoutPercent'>> & {
     halfLifeDays?: number;
+    /** How scores are written in this config and its tags. Default `unit`. */
+    scale?: Scale;
   };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -51,6 +88,10 @@ export function validateConfig(input: unknown): string[] {
   if (c.minViews !== undefined && (!Number.isInteger(c.minViews) || c.minViews < 1)) {
     errors.push('minViews must be a whole number, 1 or more.');
   }
+  if (c.scale !== undefined && c.scale !== 'unit' && c.scale !== 'fibonacci') {
+    errors.push('scale must be "unit" or "fibonacci".');
+  }
+  const fib = c.scale === 'fibonacci';
   if (c.holdoutPercent !== undefined && (!isNum(c.holdoutPercent) || c.holdoutPercent < 0 || c.holdoutPercent > 50)) {
     errors.push('holdoutPercent must be between 0 and 50.');
   }
@@ -113,7 +154,9 @@ export function validateConfig(input: unknown): string[] {
       let any = false;
       for (const [aid, v] of Object.entries(targets ?? {})) {
         if (!attrs.has(aid)) errors.push(`${where}: “${aid}” is not an attribute of ${cid}.`);
-        else if (!isNum(v) || v < 0 || v > 1) errors.push(`${where}: ${cid}.${aid} must be between 0 and 1.`);
+        else if (fib ? !isPoint(v) : !isNum(v) || v < 0 || v > 1) {
+          errors.push(`${where}: ${cid}.${aid} must be ${fib ? 'one of 0, 1, 2, 3, 5, 8' : 'between 0 and 1'}.`);
+        }
         else if (v > 0) any = true;
       }
       if (!any) errors.push(`${where}: ${cid} needs at least one target above 0, or leave the category out to mean “any”.`);
@@ -128,9 +171,10 @@ export function loadConfig(input: unknown): EngineConfig {
   const errors = validateConfig(input);
   if (errors.length) throw new ConfigError(errors);
   const c = input as ConfigInput;
+  const scale = c.scale ?? 'unit';
   return {
     categories: c.categories,
-    archetypes: c.archetypes ?? [],
+    archetypes: (c.archetypes ?? []).map((a) => ({ ...a, fingerprint: tagsToUnit(a.fingerprint, scale) })),
     audienceRadius: c.audienceRadius ?? DEFAULTS.audienceRadius,
     archetypeRadius: c.archetypeRadius ?? DEFAULTS.archetypeRadius,
     minViews: c.minViews ?? DEFAULTS.minViews,

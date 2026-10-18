@@ -1,0 +1,14 @@
+{
+  "name": "@intent/tagger",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI tagging preview: reads a page and scores it on your categories in Fibonacci points.",
+  "exports": "./src/index.ts",
+  "bin": {
+    "intent-tag": "./src/cli.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0"
+  }
+}

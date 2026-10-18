@@ -1,13 +1,14 @@
 <!doctype html>
 <!--
-  intent snippet example: Tidewater Hotels (fictional).
+  intent snippet example: Harborline Hotels (fictional).
 
   A site adds three things:
 
   1. The config. One JSON block naming the categories, attributes, and
      archetypes, plus optional tags for clickable content. Then one script tag.
-  2. Per-page tags. A meta tag with this page’s 0 to 1 scores, written by the
-     CMS or the AI crawler. (Or a central tag map via "tagsUrl".)
+  2. Per-page tags. A meta tag with this page’s scores in Fibonacci points
+     (1, 2, 3, 5, 8), written by your CMS or by the AI tagger (packages/tagger).
+     Or a central tag map via "tagsUrl".
   3. Slots. Wrap content variants in data-intent-slot. Each variant says who
      it is for with data-intent-show; one is the data-intent-default.
 
@@ -18,16 +19,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tidewater Hotels</title>
+  <title>Harborline Hotels</title>
 
   <!-- 2. Per-page tags: this home page leans a little toward every kind of trip. -->
   <meta name="intent:id" content="home">
-  <meta name="intent:tags" content='{"trip":{"business":0.3,"family":0.3,"couples":0.3,"music":0.3}}'>
+  <meta name="intent:tags" content='{"trip":{"business":2,"family":2,"couples":2,"music":2}}'>
 
   <!-- 1. The config. -->
   <script type="application/json" id="intent-config">
   {
     "config": {
+      "scale": "fibonacci",
       "categories": [
         { "id": "trip", "label": "Trip type", "attributes": [
           { "id": "business" }, { "id": "family" }, { "id": "couples" }, { "id": "music" } ] },
@@ -40,20 +42,20 @@
       ],
       "archetypes": [
         { "id": "family-planner", "label": "Family planner",
-          "fingerprint": { "trip": { "family": 1 }, "interest": { "pool": 1 } } },
+          "fingerprint": { "trip": { "family": 8 }, "interest": { "pool": 8 } } },
         { "id": "road-warrior", "label": "Road warrior",
-          "fingerprint": { "trip": { "business": 1 }, "stay": { "extended": 0.8, "standard": 0.4 } } },
+          "fingerprint": { "trip": { "business": 8 }, "stay": { "extended": 5, "standard": 3 } } },
         { "id": "show-weekender", "label": "Show weekender",
-          "fingerprint": { "trip": { "music": 1, "couples": 0.5 }, "interest": { "live-shows": 1 } } }
+          "fingerprint": { "trip": { "music": 8, "couples": 3 }, "interest": { "live-shows": 8 } } }
       ],
       "minViews": 2,
       "holdoutPercent": 5
     },
     "tags": {
-      "family-suites": { "trip": { "family": 1 }, "stay": { "suite": 1 }, "interest": { "pool": 0.6 } },
-      "kids-pool":     { "trip": { "family": 0.9 }, "interest": { "pool": 1 } },
-      "workspace":     { "trip": { "business": 1 }, "stay": { "extended": 1 } },
-      "concert-nights": { "trip": { "music": 1, "couples": 0.6 }, "interest": { "live-shows": 1 } }
+      "family-suites": { "trip": { "family": 8 }, "stay": { "suite": 8 }, "interest": { "pool": 5 } },
+      "kids-pool":     { "trip": { "family": 8 }, "interest": { "pool": 8 } },
+      "workspace":     { "trip": { "business": 8 }, "stay": { "extended": 8 } },
+      "concert-nights": { "trip": { "music": 8, "couples": 5 }, "interest": { "live-shows": 8 } }
     }
   }
   </script>
@@ -80,7 +82,7 @@
 </head>
 <body>
   <header>
-    <span class="brand">Tidewater Hotels</span>
+    <span class="brand">Harborline Hotels</span>
     <button type="button" onclick="window.intent && window.intent.reset()">Reset me</button>
   </header>
 
@@ -128,13 +130,13 @@
       <div class="card">
         <h2>Concert nights</h2>
         <p>Show tickets bundled with your room.</p>
-        <button type="button" data-intent-track="concert-nights" data-intent-weight="3">Get the bundle</button>
+        <button type="button" data-intent-track="concert-nights" data-intent-weight="save">Get the bundle</button>
       </div>
       <div class="card">
         <h2>Rooftop jazz</h2>
         <p>Tagged inline on the button, no content id needed.</p>
         <button type="button" data-intent-track
-          data-intent-tags='{"trip":{"music":0.8,"couples":0.8},"interest":{"live-shows":0.7}}'>Explore</button>
+          data-intent-tags='{"trip":{"music":5,"couples":5},"interest":{"live-shows":5}}'>Explore</button>
       </div>
     </div>
 

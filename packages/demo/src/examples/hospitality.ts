@@ -1,4 +1,4 @@
-// Flagship demo: a fictional upscale hotel and resort group, “Larkspur Hotels
+// Flagship demo: a fictional upscale hotel and resort group, “Aldermere Hotels
 // & Resorts”, with a beach resort, a mountain lodge, a wine country inn, and
 // city hotels. Leisure, business, and group travelers all land on one site.
 
@@ -7,8 +7,8 @@ import type { Example } from './types.ts';
 const example: Example = {
   id: 'hospitality',
   industry: 'Hospitality',
-  brand: 'Larkspur Hotels & Resorts',
-  domain: 'larkspurhotels.example',
+  brand: 'Aldermere Hotels & Resorts',
+  domain: 'aldermerehotels.example',
   config: {
     minViews: 3,
     halfLifeDays: 14,
@@ -58,7 +58,7 @@ const example: Example = {
       },
       {
         id: 'loyalty',
-        label: 'Larkspur Circle',
+        label: 'Aldermere Circle',
         attributes: [
           { id: 'guest', label: 'Not Yet a Member' },
           { id: 'member', label: 'Member' },
@@ -123,14 +123,14 @@ const example: Example = {
     { id: 'pelican-key', type: 'Destination', title: 'Pelican Key: a Gulf Coast beach resort guide', minutes: 6 },
     { id: 'highland-lodge', type: 'Destination', title: 'Highland Lodge: ski, hike, and slow down', minutes: 5 },
     { id: 'vale-house', type: 'Destination', title: 'Vale House: harvest season in wine country', minutes: 5 },
-    { id: 'city-hotels', type: 'Hotels', title: 'Larkspur Midtown and Riverside: downtown, walkable', minutes: 3 },
-    { id: 'meetings', type: 'Landing', title: 'Meetings and events at Larkspur', minutes: 4 },
+    { id: 'city-hotels', type: 'Hotels', title: 'Aldermere Midtown and Riverside: downtown, walkable', minutes: 3 },
+    { id: 'meetings', type: 'Landing', title: 'Meetings and events at Aldermere', minutes: 4 },
     { id: 'event-spaces', type: 'Tool', title: 'Event space finder: capacity charts and floor plans', minutes: 6 },
     { id: 'group-rfp', type: 'Form', title: 'Request a group proposal for 10 or more rooms', minutes: 3 },
     { id: 'spa-retreat', type: 'Offer', title: 'Three-night wellness retreat at Highland Lodge', minutes: 4 },
     { id: 'weekend-for-two', type: 'Offer', title: 'Weekend for two: suite upgrade and 2PM checkout', minutes: 2 },
     { id: 'weddings', type: 'Guide', title: 'Weddings at Vale House: the vineyard lawn and barrel room', minutes: 7 },
-    { id: 'circle-tiers', type: 'Loyalty', title: 'Larkspur Circle: tiers, points, and member rates', minutes: 4 },
+    { id: 'circle-tiers', type: 'Loyalty', title: 'Aldermere Circle: tiers, points, and member rates', minutes: 4 },
     { id: 'suite-upgrades', type: 'Loyalty', title: 'Platinum suite upgrades: how confirmed upgrades work', minutes: 3 },
     { id: 'check-rates', type: 'Tool', title: 'Check rates and availability', minutes: 2 },
     { id: 'pre-arrival', type: 'Stay', title: 'Before you arrive: dining, spa, and airport transfers', minutes: 3 },
@@ -224,7 +224,7 @@ const example: Example = {
   },
   hero: {
     default: {
-      eyebrow: 'Larkspur Hotels & Resorts',
+      eyebrow: 'Aldermere Hotels & Resorts',
       headline: 'Stay somewhere that remembers you.',
       sub: 'Beach, mountain, wine country, and city hotels, with a team that knows your name by the second night.',
       cta: 'Find your stay',
@@ -239,13 +239,13 @@ const example: Example = {
       'corporate-event-planner': {
         eyebrow: 'Meetings & Events',
         headline: 'Your next offsite, handled end to end.',
-        sub: 'One planner, one proposal, room blocks and event space across every Larkspur. Proposals within one business day.',
+        sub: 'One planner, one proposal, room blocks and event space across every Aldermere. Proposals within one business day.',
         cta: 'Request a proposal',
       },
       'elite-weekend-escaper': {
         eyebrow: 'For Gold and Platinum members',
-        headline: 'Your suite is waiting this weekend.',
-        sub: 'Confirmed suite upgrades, 2PM checkout, and a table held at the chef’s counter. Book by Thursday for Friday arrival.',
+        headline: 'Make it a suite weekend.',
+        sub: 'Gold and Platinum members get confirmed upgrades and 2PM checkout. Book by Thursday for Friday arrival.',
         cta: 'Book your weekend',
       },
       'wellness-seeker': {
@@ -255,7 +255,7 @@ const example: Example = {
         cta: 'See the retreat',
       },
       'road-warrior': {
-        eyebrow: 'Larkspur Circle',
+        eyebrow: 'Aldermere Circle',
         headline: 'The city stay that works like you do.',
         sub: 'Member rates, mobile key, and a quiet room on a high floor. Points on every night, including corporate rates.',
         cta: 'Book with member rates',
@@ -285,7 +285,7 @@ const example: Example = {
         stay: { eyebrow: 'Before you arrive', cta: 'Plan your stay' },
       },
       loyalty: {
-        guest: { cta: 'Join Larkspur Circle' },
+        guest: { cta: 'Join Aldermere Circle' },
         elite: { eyebrow: 'For Gold and Platinum members' },
       },
     },

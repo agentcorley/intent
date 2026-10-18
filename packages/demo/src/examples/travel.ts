@@ -228,8 +228,8 @@ const example: Example = {
       },
       'corporate-road-warrior': {
         eyebrow: 'For Gold and Platinum members',
-        headline: 'Your upgrade, cleared before boarding.',
-        sub: 'Priority on the upgrade list, hourly shuttles between Boston, New York, and Washington, and miles on corporate fares.',
+        headline: 'Fly the corridor like you own it.',
+        sub: 'Status members get priority on the upgrade list, hourly shuttles between Boston, New York, and Washington, and miles on corporate fares.',
         cta: 'Check upgrade status',
       },
       'card-ready-member': {

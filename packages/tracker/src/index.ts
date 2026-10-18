@@ -73,6 +73,10 @@ interface Stored {
 }
 
 export const MATCH_EVENT = 'intent:match';
+
+/** Action strength on the same Fibonacci ladder as tags. Use as the `weight` in view(). */
+export const ACTIONS = { view: 1, engage: 2, save: 3, download: 5, convert: 8 } as const;
+export type Action = keyof typeof ACTIONS;
 const MINUTE = 60 * 1000;
 const DAY = 24 * 60 * MINUTE;
 
@@ -90,7 +94,7 @@ export function memoryStorage(): TrackerStorage {
   return { get: () => value, set: (v) => { value = v; }, clear: () => { value = null; } };
 }
 
-/** Cookie value: `industry.tech~product.standby~archetype.data-center-buyer`. Ids only, never PII. */
+/** Cookie value: `purpose.family~destination.beach~archetype.family-summer-planner`. Ids only, never PII. */
 export function cookieValue(detail: MatchDetail): string {
   if (detail.holdout) return 'holdout';
   const parts = detail.audiences.filter((a) => a.audience).map((a) => `${a.category}.${a.audience}`);

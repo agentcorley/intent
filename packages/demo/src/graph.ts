@@ -22,7 +22,7 @@ export type GraphMode = 'visitor' | 'aggregate';
 export interface GraphLabels {
   /** Toggle and hub label in visitor mode. Default “This visitor”. */
   visitor?: string;
-  /** Toggle and hub label in aggregate mode. Default “All visitors”. */
+  /** Toggle and hub label in aggregate mode. Default “Simulated audience”. */
   population?: string;
 }
 
@@ -120,7 +120,7 @@ function archetypeFits(config: EngineConfig, norm: Record<string, Scores | null>
 
 export function createIntentGraph(root: HTMLElement, opts: GraphOptions): GraphHandle {
   const { config } = opts;
-  const labels = { visitor: 'This visitor', population: 'All visitors', ...opts.labels };
+  const labels = { visitor: 'This visitor', population: 'Simulated audience', ...opts.labels };
   const uid = `ig${Math.random().toString(36).slice(2, 8)}`;
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   let reduce = motion.matches;
@@ -510,7 +510,7 @@ export function createIntentGraph(root: HTMLElement, opts: GraphOptions): GraphH
     hub.label = labels.visitor;
     setLabel(hub, labels.visitor);
     hubNum.textContent = String(views);
-    hubCap.textContent = views === 1 ? 'view' : 'views';
+    hubCap.textContent = views === 1 ? 'read' : 'reads';
     progress(detail?.ready ? 1 : Math.min(1, views / Math.max(1, config.minViews)), !!detail?.ready);
     hub.g.classList.toggle('is-ready', !!detail?.ready);
 
@@ -738,7 +738,7 @@ export function createIntentGraph(root: HTMLElement, opts: GraphOptions): GraphH
     if (mode === 'aggregate' && population) {
       const count = population.audienceCounts[cat]?.[attr] ?? 0;
       const share = count / Math.max(1, population.size);
-      return `${about}<dl>${row('Visitors in it', `${pct(share)} <small>${count} of ${population.size}</small>`)}${row(
+      return `${about}<dl>${row('Simulated visitors in it', `${pct(share)} <small>${count} of ${population.size}</small>`)}${row(
         'Targeted by',
         targeting.length ? targeting.map((a) => esc(a.label ?? a.id)).join(', ') : 'No archetype',
       )}</dl>`;
@@ -749,9 +749,9 @@ export function createIntentGraph(root: HTMLElement, opts: GraphOptions): GraphH
     const raw = v?.state ? v.state.scores[cat]?.[attr] ?? 0 : 0;
     const res = v?.detail.audiences.find((a) => a.category === cat);
     const status = !v || !v.detail.ready
-      ? `Warming up (${v?.detail.views ?? 0} of ${config.minViews} views)`
+      ? `Warming up (${v?.detail.views ?? 0} of ${config.minViews} reads)`
       : res?.audience === attr ? '<b class="ig-yes">Matched</b>'
-      : res?.nearest === attr ? `Nearest, outside radius (${num(res.distance)} > ${num(config.audienceRadius ** 2)})`
+      : res?.nearest === attr ? `Nearest, not close enough (distance² ${num(res.distance)}, limit ${num(config.audienceRadius ** 2)})`
       : res?.audience ? `No, ${esc(attrLabel(cat, res.audience))} wins` : 'No';
 
     // Contribution to the matched (or nearest) archetype's mean distance.
@@ -812,7 +812,7 @@ export function createIntentGraph(root: HTMLElement, opts: GraphOptions): GraphH
     const status = !v || !Object.values(v.norm).some(Boolean) ? 'No signal yet'
       : v.detail.archetype.archetype === a.id ? '<b class="ig-yes">Matched</b>'
       : !v.detail.ready && v.detail.archetype.nearest === a.id ? `Nearest, warming up (${v.detail.views} of ${config.minViews})`
-      : v.detail.archetype.nearest === a.id ? 'Nearest, outside radius'
+      : v.detail.archetype.nearest === a.id ? 'Nearest, not close enough'
       : 'Not nearest';
     return `${about}<dl>${row('Status', status)}${row('Mean distance', `${num(fit?.distance ?? Infinity)} <small>match at ≤ ${num(r2)}</small>`)}</dl><h4>Fingerprint · you / target</h4>${print}`;
   }
@@ -843,7 +843,7 @@ export function createIntentGraph(root: HTMLElement, opts: GraphOptions): GraphH
     if (dragging) return;
     let head = esc(n.label);
     let body = '';
-    if (n.kind === 'hub') body = mode === 'aggregate' && population ? `${pct(1 - population.unmatched / Math.max(1, population.size))} matched an archetype` : `${visitor?.detail.views ?? 0} tagged views`;
+    if (n.kind === 'hub') body = mode === 'aggregate' && population ? `${pct(1 - population.unmatched / Math.max(1, population.size))} of simulated visitors matched an archetype` : `${visitor?.detail.views ?? 0} tagged reads`;
     else if (n.kind === 'category') {
       const aud = mode === 'visitor' ? visitor?.detail.audiences.find((a) => a.category === n.cat)?.audience : null;
       body = `${aud ? `Audience: ${esc(attrLabel(n.cat!, aud))}` : 'No audience yet'} · click to ${collapsed.has(n.cat!) ? 'unfold' : 'fold'}`;

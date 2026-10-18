@@ -2,7 +2,7 @@
 // Reads the config, records the page view, swaps slot variants, and exposes
 // window.intent. Any failure leaves the page on its default content.
 
-import { loadConfig } from '../../config/src/index.ts';
+import { loadConfig, type Scale } from '../../config/src/index.ts';
 import type { CategoryScores, EngineConfig } from '../../core/src/index.ts';
 import {
   createTracker, memoryStorage, MATCH_EVENT,
@@ -26,6 +26,12 @@ export interface IntentApi {
   setHoldout(value: boolean): MatchDetail;
   /** Call `handler` on every intent:match. Returns an unsubscribe function. */
   on(handler: (detail: MatchDetail) => void): () => void;
+  /** Re-apply slots now, for slots a framework rendered after the last match. */
+  apply(): void;
+  /** Consent withdrawn: erase everything intent stored, show defaults, and stop tracking on this page. */
+  forget(): void;
+  /** True when Global Privacy Control or Do Not Track switched intent off for this visitor. */
+  optedOut: boolean;
 }
 
 declare global {
@@ -38,6 +44,9 @@ const CACHE_PREFIX = 'intent:tags:';
 // Before the script finishes, slots show only their default. If it never finishes, that stays true.
 const ANTI_FLICKER =
   `html:not(.${READY_CLASS}) [data-intent-slot]>:not([data-intent-default]),[data-intent-slot]>[hidden]{display:none!important}`;
+
+/** How this site writes scores; set once the config loads. */
+let scale: Scale = 'unit';
 
 const log = (message: string) => console.error(`[intent] ${message}`);
 
@@ -75,23 +84,25 @@ function start() {
 }
 
 function run(settings: SnippetSettings, config: EngineConfig) {
-  // GPC or DNT: holdout with nothing stored and no network calls.
+  // GPC or DNT: fully silent. Nothing stored, no attributes, no events, no network.
+  // Opted-out visitors are kept out of the control group so they never skew lift.
   const quiet = optedOut(navigator as Navigator & PrivacySignals, settings.respectGPC !== false);
-  const map: ContentTags = cleanTagMap(settings.tags);
+  scale = settings.config.scale ?? 'unit';
+  const map: ContentTags = cleanTagMap(settings.tags, scale);
   const tracker = createTracker({
     config,
     tags: map,
-    doc: quiet ? quietDoc() : (document as unknown as DocLike),
+    doc: quiet ? null : (document as unknown as DocLike),
     ...(quiet ? { storage: memoryStorage() } : {}),
   });
 
   document.addEventListener(MATCH_EVENT, (e) => applySlots((e as CustomEvent<MatchDetail>).detail));
   document.addEventListener('click', (e) => onClick(e, api), true);
-  const api = createApi(tracker, map);
+  const api = createApi(tracker, map, quiet);
   window.intent = api;
 
   if (quiet) {
-    tracker.setHoldout(true);
+    showDefaults();
     document.documentElement.classList.add(READY_CLASS);
     return;
   }
@@ -103,7 +114,8 @@ function run(settings: SnippetSettings, config: EngineConfig) {
   document.documentElement.classList.add(READY_CLASS);
   if (settings.tagsUrl) {
     fetchTags(settings.tagsUrl).then((remote) => {
-      Object.assign(map, remote, cleanTagMap(settings.tags));
+      // The cache holds the map as written; convert to 0–1 here, once.
+      Object.assign(map, cleanTagMap(remote, scale), cleanTagMap(settings.tags, scale));
       if (!recorded) recordPage(tracker, map);
     });
   }
@@ -112,7 +124,7 @@ function run(settings: SnippetSettings, config: EngineConfig) {
 /** Record the current page. Returns null when the page has no tags. */
 function recordPage(tracker: Tracker, map: ContentTags): MatchDetail | null {
   const page = resolvePage({
-    inline: parseTags(meta('intent:tags')),
+    inline: parseTags(meta('intent:tags'), scale),
     id: meta('intent:id'),
     path: location.pathname,
     map,
@@ -122,12 +134,15 @@ function recordPage(tracker: Tracker, map: ContentTags): MatchDetail | null {
   return tracker.view(page.id);
 }
 
-function createApi(tracker: Tracker, map: ContentTags): IntentApi {
+function createApi(tracker: Tracker, map: ContentTags, quiet: boolean): IntentApi {
+  let stopped = quiet;
   return {
     version: VERSION,
-    view: (id, weight = 1) => tracker.view(id, weight),
+    optedOut: quiet,
+    view: (id, weight = 1) => (stopped ? tracker.matches() : tracker.view(id, weight)),
     track(tags, weight = 1) {
-      const clean = cleanTags(tags);
+      if (stopped) return null;
+      const clean = cleanTags(tags, scale);
       if (!clean) return null;
       const id = tagsId(clean);
       map[id] = clean;
@@ -141,7 +156,41 @@ function createApi(tracker: Tracker, map: ContentTags): IntentApi {
       document.addEventListener(MATCH_EVENT, listener);
       return () => document.removeEventListener(MATCH_EVENT, listener);
     },
+    apply() {
+      if (stopped) showDefaults();
+      else applySlots(tracker.matches());
+    },
+    forget() {
+      stopped = true;
+      tracker.reset();
+      erase();
+      showDefaults();
+    },
   };
+}
+
+/** Every slot back to its default. */
+function showDefaults() {
+  applySlots({ ...emptyDetail(), holdout: true });
+}
+
+function emptyDetail(): MatchDetail {
+  return { ready: false, views: 0, holdout: false, audiences: [], archetype: { archetype: null, nearest: null, distance: Infinity, categories: [], missing: [] } };
+}
+
+/** Remove everything intent wrote: storage, tag cache, cookie, and page attributes. */
+function erase() {
+  try {
+    localStorage.removeItem('intent:v2');
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith(CACHE_PREFIX)) sessionStorage.removeItem(key);
+    }
+  } catch { /* storage unavailable */ }
+  document.cookie = 'intent=; path=/; max-age=0; SameSite=Lax';
+  for (const a of Array.from(document.documentElement.attributes)) {
+    if (a.name.startsWith('data-intent-')) document.documentElement.removeAttribute(a.name);
+  }
 }
 
 /** Show one child per slot: first matching variant, else the default. */
@@ -190,15 +239,4 @@ async function fetchTags(url: string): Promise<ContentTags> {
     log(`Could not load tags from ${url} (${(e as Error).message}).`);
     return {};
   }
-}
-
-/** A document stand-in that publishes attributes and events but never writes the cookie. */
-function quietDoc(): DocLike {
-  return {
-    documentElement: document.documentElement,
-    cookie: '',
-    addEventListener: document.addEventListener.bind(document),
-    removeEventListener: document.removeEventListener.bind(document),
-    dispatchEvent: document.dispatchEvent.bind(document),
-  };
 }
