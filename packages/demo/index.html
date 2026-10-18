@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Intent Live Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="word">intent</span>
+        <span class="badge">working name</span>
+      </div>
+      <p class="promise">
+        Click anything on the site. The engine learns from what you read, finds the audience you lean toward in each category and the archetype you resemble most, and the site adapts.
+      </p>
+      <div class="controls">
+        <div class="industry" id="industry"></div>
+        <div class="scenarios" role="group" aria-label="Play a visitor">
+          <span class="label">Play a visitor</span>
+          <div id="scenarios" class="seg"></div>
+        </div>
+        <div class="time" role="group" aria-label="Time">
+          <span class="day" id="day">Day 0</span>
+          <button class="ghost" id="ff" title="Skip ahead a week to watch interest fade">+7 days</button>
+          <button class="ghost" id="reset">Reset</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="stage">
+      <section class="site" aria-label="Demo site">
+        <div class="chrome" aria-hidden="true">
+          <span class="dots"><i></i><i></i><i></i></span>
+          <span class="url"><span class="lock">●</span> <span id="url"></span></span>
+        </div>
+        <div class="site-body">
+          <div class="hero" id="hero"></div>
+          <div class="library-head">
+            <h2>Explore</h2>
+            <span class="hint">Click to read</span>
+          </div>
+          <div class="cards" id="cards"></div>
+        </div>
+      </section>
+
+      <aside class="engine" aria-label="What the engine sees">
+        <div class="engine-head">
+          <h2>What the engine sees</h2>
+          <span class="warmup" id="warmup"></span>
+        </div>
+        <section class="archetype" id="archetype"></section>
+        <div class="section-label">
+          <h3>Audiences</h3>
+          <span class="hint">one per category</span>
+        </div>
+        <div id="audiences" class="audiences"></div>
+        <div class="contract">
+          <div class="contract-head">
+            <h3>What your CMS receives</h3>
+            <label class="switch">
+              <input type="checkbox" id="holdout" />
+              <span class="knob" aria-hidden="true"></span>
+              Control group
+            </label>
+          </div>
+          <pre id="attrs" class="code"></pre>
+          <ol id="log" class="log" aria-live="polite"></ol>
+        </div>
+      </aside>
+    </main>
+
+    <section class="graph-section" aria-label="Knowledge graph">
+      <div class="graph-head">
+        <div>
+          <h2>Knowledge graph</h2>
+          <p class="hint">Drag nodes, click a category to expand it, click anything to see why. Switch between this visitor and all visitors.</p>
+        </div>
+        <span class="hint" id="half-life"></span>
+      </div>
+      <div id="graph" class="graph-wrap"></div>
+    </section>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

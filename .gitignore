@@ -1,0 +1,10 @@
+node_modules
+dist
+!packages/snippet/dist
+.DS_Store
+*.log
+.claude/
+
+# Internal working notes and sales collateral stay off GitHub during stealth
+CLAUDE.md
+docs/

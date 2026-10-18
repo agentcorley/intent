@@ -1,0 +1,19 @@
+{
+  "name": "intent-matching-engine",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "node --test \"packages/*/test/*.test.ts\"",
+    "dev": "npm run dev -w @intent/demo",
+    "build": "npm run build -w @intent/snippet --if-present && npm run build -w @intent/demo"
+  },
+  "version": "0.1.0",
+  "description": "Inferred-intent personalization: match each visitor to audiences and archetypes from what they read. Client-side, no PII.",
+  "license": "MIT"
+}

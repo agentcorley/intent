@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Intent Graph Harness</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+      :root { color-scheme: light dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px 16px 48px;
+        font: 14px/1.5 'Geist', ui-sans-serif, system-ui, sans-serif;
+        background: #f5f5f3;
+        color: #111110;
+      }
+      @media (prefers-color-scheme: dark) { body { background: #0b0b0d; color: #f4f4f5; } }
+      main { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
+      h1 { margin: 0; font-size: 19px; letter-spacing: -0.02em; }
+      p { margin: 0; opacity: 0.65; }
+      .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      .row span { font: 500 11px/1 'Geist Mono', ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; margin-right: 4px; }
+      button {
+        font: inherit; font-size: 12.5px; color: inherit; cursor: pointer;
+        border: 1px solid rgb(127 127 127 / 0.35); background: transparent; border-radius: 8px; padding: 5px 10px;
+      }
+      button:hover { border-color: currentColor; }
+      button.read { opacity: 0.55; }
+      #status { font: 12px/1.4 'Geist Mono', ui-monospace, monospace; opacity: 0.75; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Intent graph harness</h1>
+        <p>Harbor &amp; Pine Hotels, a fictional brand. Read content, play a visitor, or switch to all visitors.</p>
+      </header>
+      <div class="row" id="scenarios"><span>Play</span></div>
+      <div class="row" id="content"><span>Read</span></div>
+      <div class="row">
+        <span>Time</span>
+        <button id="ff">+7 days</button>
+        <button id="reset">Reset visitor</button>
+        <button id="mode-v">This visitor</button>
+        <button id="mode-a">All visitors</button>
+        <button id="remount">Remount</button>
+      </div>
+      <div id="graph"></div>
+      <div id="status" aria-live="polite"></div>
+    </main>
+    <script type="module" src="/src/graph-harness.ts"></script>
+  </body>
+</html>

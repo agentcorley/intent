@@ -1,0 +1,155 @@
+<!doctype html>
+<!--
+  intent snippet example: Tidewater Hotels (fictional).
+
+  A site adds three things:
+
+  1. The config. One JSON block naming the categories, attributes, and
+     archetypes, plus optional tags for clickable content. Then one script tag.
+  2. Per-page tags. A meta tag with this page’s 0 to 1 scores, written by the
+     CMS or the AI crawler. (Or a central tag map via "tagsUrl".)
+  3. Slots. Wrap content variants in data-intent-slot. Each variant says who
+     it is for with data-intent-show; one is the data-intent-default.
+
+  Build the script first (npm run build -w @intent/snippet), then open this
+  file. Click a few “Explore” buttons and watch the hero change.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tidewater Hotels</title>
+
+  <!-- 2. Per-page tags: this home page leans a little toward every kind of trip. -->
+  <meta name="intent:id" content="home">
+  <meta name="intent:tags" content='{"trip":{"business":0.3,"family":0.3,"couples":0.3,"music":0.3}}'>
+
+  <!-- 1. The config. -->
+  <script type="application/json" id="intent-config">
+  {
+    "config": {
+      "categories": [
+        { "id": "trip", "label": "Trip type", "attributes": [
+          { "id": "business" }, { "id": "family" }, { "id": "couples" }, { "id": "music" } ] },
+        { "id": "stay", "label": "Room", "attributes": [
+          { "id": "standard" }, { "id": "suite" }, { "id": "extended" } ] },
+        { "id": "interest", "label": "Interest", "attributes": [
+          { "id": "dining" }, { "id": "spa" }, { "id": "pool" }, { "id": "live-shows" } ] },
+        { "id": "stage", "label": "Buying stage", "attributes": [
+          { "id": "browsing" }, { "id": "comparing" }, { "id": "booking" } ] }
+      ],
+      "archetypes": [
+        { "id": "family-planner", "label": "Family planner",
+          "fingerprint": { "trip": { "family": 1 }, "interest": { "pool": 1 } } },
+        { "id": "road-warrior", "label": "Road warrior",
+          "fingerprint": { "trip": { "business": 1 }, "stay": { "extended": 0.8, "standard": 0.4 } } },
+        { "id": "show-weekender", "label": "Show weekender",
+          "fingerprint": { "trip": { "music": 1, "couples": 0.5 }, "interest": { "live-shows": 1 } } }
+      ],
+      "minViews": 2,
+      "holdoutPercent": 5
+    },
+    "tags": {
+      "family-suites": { "trip": { "family": 1 }, "stay": { "suite": 1 }, "interest": { "pool": 0.6 } },
+      "kids-pool":     { "trip": { "family": 0.9 }, "interest": { "pool": 1 } },
+      "workspace":     { "trip": { "business": 1 }, "stay": { "extended": 1 } },
+      "concert-nights": { "trip": { "music": 1, "couples": 0.6 }, "interest": { "live-shows": 1 } }
+    }
+  }
+  </script>
+  <script src="../dist/intent.min.js"></script>
+
+  <style>
+    :root { --ink: #1c2430; --sea: #1f5f7a; --sand: #f6f1e7; --line: #d9d2c3; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: var(--ink); background: var(--sand); }
+    header, main, footer { max-width: 960px; margin: 0 auto; padding: 16px; }
+    header { display: flex; justify-content: space-between; align-items: center; }
+    .brand { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sea); }
+    .hero { background: var(--sea); color: #fff; border-radius: 12px; padding: 40px 32px; min-height: 200px; }
+    .hero h1 { margin: 0 0 8px; font-size: clamp(1.6rem, 4vw, 2.4rem); }
+    .hero p { margin: 0 0 20px; max-width: 40em; }
+    .hero a { color: var(--sea); background: #fff; padding: 10px 16px; border-radius: 999px; text-decoration: none; font-weight: 600; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 24px; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+    .card h2 { font-size: 1.05rem; margin: 0 0 4px; }
+    .card p { margin: 0 0 12px; font-size: 0.95rem; }
+    button { font: inherit; border: 1px solid var(--sea); color: var(--sea); background: none; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+    #debug { margin-top: 24px; font: 13px/1.5 ui-monospace, monospace; background: #fff; border: 1px dashed var(--line); border-radius: 10px; padding: 12px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="brand">Tidewater Hotels</span>
+    <button type="button" onclick="window.intent && window.intent.reset()">Reset me</button>
+  </header>
+
+  <main>
+    <!-- 3. A slot: three archetype variants plus a default. -->
+    <section class="hero" data-intent-slot="home-hero">
+      <div data-intent-show="archetype:family-planner">
+        <h1>Room for everyone, and a pool they won’t leave</h1>
+        <p>Connecting suites, a kids’ splash deck, and breakfast that starts when they do.</p>
+        <a href="#family">See family suites</a>
+      </div>
+      <div data-intent-show="archetype:road-warrior, trip:business">
+        <h1>Your desk on the road</h1>
+        <p>Fast Wi-Fi, quiet floors, and weekly rates that make a long stay simple.</p>
+        <a href="#work">Book an extended stay</a>
+      </div>
+      <div data-intent-show="archetype:show-weekender">
+        <h1>Two blocks from the stage</h1>
+        <p>Late checkout after the encore and a nightcap at the rooftop bar.</p>
+        <a href="#shows">Plan a show weekend</a>
+      </div>
+      <div data-intent-default>
+        <h1>Stay by the water</h1>
+        <p>Harbor views, a calm pool deck, and a team that remembers your name.</p>
+        <a href="#rooms">Explore rooms</a>
+      </div>
+    </section>
+
+    <div class="cards">
+      <div class="card">
+        <h2>Family suites</h2>
+        <p>Two rooms, one door, plenty of quiet.</p>
+        <button type="button" data-intent-track="family-suites">Explore</button>
+      </div>
+      <div class="card">
+        <h2>Splash deck</h2>
+        <p>Shallow pools and lifeguards all day.</p>
+        <button type="button" data-intent-track="kids-pool">Explore</button>
+      </div>
+      <div class="card">
+        <h2>Workspace rooms</h2>
+        <p>A real desk and weekly rates.</p>
+        <button type="button" data-intent-track="workspace">Explore</button>
+      </div>
+      <div class="card">
+        <h2>Concert nights</h2>
+        <p>Show tickets bundled with your room.</p>
+        <button type="button" data-intent-track="concert-nights" data-intent-weight="3">Get the bundle</button>
+      </div>
+      <div class="card">
+        <h2>Rooftop jazz</h2>
+        <p>Tagged inline on the button, no content id needed.</p>
+        <button type="button" data-intent-track
+          data-intent-tags='{"trip":{"music":0.8,"couples":0.8},"interest":{"live-shows":0.7}}'>Explore</button>
+      </div>
+    </div>
+
+    <div id="debug">Waiting for intent…</div>
+  </main>
+
+  <script>
+    // Optional: developers can listen for every match. Marketers never need this.
+    function show(d) {
+      var aud = d.audiences.map(function (a) { return a.category + ': ' + (a.audience || '(none)'); }).join('\n');
+      document.getElementById('debug').textContent =
+        'views ' + d.views + (d.ready ? '' : ' (warming up)') + (d.holdout ? ', holdout' : '') +
+        '\narchetype: ' + (d.archetype.archetype || '(none, nearest ' + d.archetype.nearest + ')') + '\n' + aud;
+    }
+    document.addEventListener('intent:match', function (e) { show(e.detail); });
+  </script>
+</body>
+</html>
