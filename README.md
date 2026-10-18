@@ -18,6 +18,8 @@ Built for customer-experience brands: hotels and resorts, airlines, live music, 
 
 ## See it
 
+**[Live demo →](https://agentcorley.github.io/intent/)** Or run it locally:
+
 ```bash
 git clone https://github.com/agentcorley/intent.git
 cd intent
